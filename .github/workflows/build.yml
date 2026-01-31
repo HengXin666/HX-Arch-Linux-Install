@@ -1,0 +1,96 @@
+name: Compile Arch Scripts
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Pure Bash Scripts
+        run: |
+          python3 <<EOF
+          import os
+
+          files = {'1_pre': 'pre.sh', '2_chroot': 'chroot.sh', '3_post': 'post.sh', '4_hx_cpp': 'hx_cpp.sh'}
+          
+          template_header = """#!/bin/bash
+          LOG="install.log"
+          SUCCESS=0
+          FAIL=0
+          FAILED_LIST=()
+
+          run_task() {
+              local desc="\$1"
+              local cmd="\$2"
+              echo -e "\\033[1;34m[任务描述]\\033[0m"
+              echo -e "\\033[1;36m\$desc\\033[0m"
+              echo -e "\\033[1;30m[执行命令] \$cmd\\033[0m"
+              
+              if eval "\$cmd" >> "\$LOG" 2>&1; then
+                  echo -e "\\033[1;32m✅ 成功\\033[0m"
+                  ((SUCCESS++))
+              else
+                  echo -e "\\033[1;31m❌ 失败\\033[0m"
+                  ((FAIL++))
+                  FAILED_LIST+=("\$desc")
+              fi
+              echo "-----------------------------------"
+          }
+
+          echo "开始执行安装流程..."
+          echo "==================================="
+          """
+
+          for src, out in files.items():
+              if not os.path.exists(src + ".hx.config.sh"): continue
+              
+              with open(src + ".hx.config.sh", 'r') as f:
+                  # 按空行分割任务块
+                  blocks = [b.strip() for b in f.read().split('\n\n') if b.strip()]
+              
+              tasks = []
+              for block in blocks:
+                  lines = block.split('\n')
+                  comments = []
+                  cmds = []
+                  for l in lines:
+                      l = l.strip()
+                      if not l: continue
+                      if l.startswith('#'):
+                          comments.append(l.lstrip('# ').strip())
+                      else:
+                          cmds.append(l)
+                  
+                  if not cmds: continue
+                  
+                  # 多个 # 行会被换行符 \n 连接
+                  full_desc = "\\\\n".join(comments) if comments else "未命名任务"
+                  full_cmd = " && ".join(cmds)
+                  
+                  # 转义双引号以防破坏 shell 语法
+                  full_desc = full_desc.replace('"', '\\\\"')
+                  full_cmd = full_cmd.replace('"', '\\\\"')
+                  
+                  tasks.append(f'run_task "{full_desc}" "{full_cmd}"')
+
+              with open(out, 'w') as f_out:
+                  f_out.write(template_header)
+                  f_out.write("\n".join(tasks))
+                  f_out.write('\necho -e "\\n==================================="')
+                  f_out.write('\necho -e "安装完成! 成功: $SUCCESS, 失败: $FAIL"')
+                  f_out.write('\nif [ $FAIL -ne 0 ]; then echo -e "\\033[1;31m失败项:\\033[0m"; for item in "\${FAILED_LIST[@]}"; do echo " - \$item"; done; fi\n')
+          EOF
+
+      - name: Deploy to Dist Branch
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan dist
+          git rm -rf .
+          git add *.sh
+          git commit -m "Build: $(date)"
+          git push origin dist --force
