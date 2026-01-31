@@ -51,17 +51,17 @@ pacman -S --noconfirm git vim
 
 #### 1. 基础环境 (Live USB 阶段)
 ```bash
-curl -sL https://raw.githubusercontent.com/你的用户名/你的仓库名/dist/pre.sh | bash
+curl -sL https://raw.githubusercontent.com/HengXin666/HX-Arch-Linux-Install/dist/pre.sh | bash
 ```
 
 #### 2. 系统核心配置 (chroot 阶段)
 ```bash
-curl -sL https://raw.githubusercontent.com/你的用户名/你的仓库名/dist/chroot.sh | bash
+curl -sL https://raw.githubusercontent.com/HengXin666/HX-Arch-Linux-Install/dist/chroot.sh | bash
 ```
 
 #### 3. 首次进系统 (Post-Install 阶段)
 ```bash
-curl -sL https://raw.githubusercontent.com/你的用户名/你的仓库名/dist/post.sh | bash
+curl -sL https://raw.githubusercontent.com/HengXin666/HX-Arch-Linux-Install/dist/post.sh | bash
 ```
 
 ---
