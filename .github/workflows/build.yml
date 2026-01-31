@@ -7,6 +7,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 必须赋予写权限，Action 才能推送代码
     steps:
       - uses: actions/checkout@v4
 
@@ -14,6 +16,10 @@ jobs:
         run: |
           python3 <<EOF
           import os
+
+          # 定义输出目录
+          output_dir = "output"
+          os.makedirs(output_dir, exist_ok=True)
 
           files = {'1_pre': 'pre.sh', '2_chroot': 'chroot.sh', '3_post': 'post.sh', '4_hx_cpp': 'hx_cpp.sh'}
           
@@ -29,7 +35,6 @@ jobs:
               echo -e "\\033[1;34m[任务描述]\\033[0m"
               echo -e "\\033[1;36m\$desc\\033[0m"
               echo -e "\\033[1;30m[执行命令] \$cmd\\033[0m"
-              
               if eval "\$cmd" >> "\$LOG" 2>&1; then
                   echo -e "\\033[1;32m✅ 成功\\033[0m"
                   ((SUCCESS++))
@@ -40,16 +45,15 @@ jobs:
               fi
               echo "-----------------------------------"
           }
-
           echo "开始执行安装流程..."
           echo "==================================="
           """
 
           for src, out in files.items():
-              if not os.path.exists(src + ".hx.config.sh"): continue
+              src_file = f"{src}.hx.config.sh"
+              if not os.path.exists(src_file): continue
               
-              with open(src + ".hx.config.sh", 'r') as f:
-                  # 按空行分割任务块
+              with open(src_file, 'r') as f:
                   blocks = [b.strip() for b in f.read().split('\n\n') if b.strip()]
               
               tasks = []
@@ -66,28 +70,25 @@ jobs:
                           cmds.append(l)
                   
                   if not cmds: continue
-                  
-                  # 多个 # 行会被换行符 \n 连接
                   full_desc = "\\\\n".join(comments) if comments else "未命名任务"
                   full_cmd = " && ".join(cmds)
-                  
-                  # 转义双引号以防破坏 shell 语法
                   full_desc = full_desc.replace('"', '\\\\"')
                   full_cmd = full_cmd.replace('"', '\\\\"')
-                  
                   tasks.append(f'run_task "{full_desc}" "{full_cmd}"')
 
-              with open(out, 'w') as f_out:
+              # 写入 output 目录
+              with open(os.path.join(output_dir, out), 'w') as f_out:
                   f_out.write(template_header)
                   f_out.write("\n".join(tasks))
                   f_out.write('\necho -e "\\n==================================="')
                   f_out.write('\necho -e "安装完成! 成功: $SUCCESS, 失败: $FAIL"')
                   f_out.write('\nif [ $FAIL -ne 0 ]; then echo -e "\\033[1;31m失败项:\\033[0m"; for item in "\${FAILED_LIST[@]}"; do echo " - \$item"; done; fi\n')
           EOF
+
       - name: Deploy to Dist Branch 🚀
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: output      # 部署 output 文件夹下的内容
           branch: dist        # 目标分支
           clean: true         # 每次推送前清理目标分支
-          single-commit: true # 使 dist 分支保持只有一个 commit，避免历史堆积过
+          single-commit: true # 使 dist 分支保持只有一个 commit，避免历史堆积过大
