@@ -84,13 +84,10 @@ jobs:
                   f_out.write('\necho -e "安装完成! 成功: $SUCCESS, 失败: $FAIL"')
                   f_out.write('\nif [ $FAIL -ne 0 ]; then echo -e "\\033[1;31m失败项:\\033[0m"; for item in "\${FAILED_LIST[@]}"; do echo " - \$item"; done; fi\n')
           EOF
-
-      - name: Deploy to Dist Branch
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout --orphan dist
-          git rm -rf .
-          git add *.sh
-          git commit -m "Build: $(date)"
-          git push origin dist --force
+      - name: Deploy to Dist Branch 🚀
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: output      # 部署 output 文件夹下的内容
+          branch: dist        # 目标分支
+          clean: true         # 每次推送前清理目标分支
+          single-commit: true # 使 dist 分支保持只有一个 commit，避免历史堆积过
